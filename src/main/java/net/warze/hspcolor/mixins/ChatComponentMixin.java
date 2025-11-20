@@ -86,11 +86,6 @@ public abstract class ChatComponentMixin {
         }
 
         if (newSiblings.size() > 4) {
-
-            System.out.println("--------------------------------");
-            newSiblings.forEach(c -> System.out.println(c.getString()));
-            System.out.println("--------------------------------");
-
             Component secondSibling = newSiblings.get(2);
 
             for (String rank : RANKS) {
