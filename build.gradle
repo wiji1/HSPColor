@@ -1,45 +1,12 @@
 plugins {
-    id 'maven-publish'
-    id 'fabric-loom' version '1.10-SNAPSHOT'
-
-    // https://github.com/ReplayMod/preprocessor
-    // https://github.com/Fallen-Breath/preprocessor
+    id 'idea'
+    id 'fabric-loom' version '1.10-SNAPSHOT' apply false
     id 'com.replaymod.preprocess' version '9d21b334a7'
-
-    // https://github.com/Fallen-Breath/yamlang
-    id 'me.fallenbreath.yamlang' version '1.4.1'
-}
-
-repositories {
-    maven { url 'https://maven.fabricmc.net/' }
-    maven { url 'https://maven.terraformersmc.com/releases/' }
-    maven { url 'https://maven.shedaniel.me/' }
-    mavenCentral()
-}
-
-dependencies {
-	// To change the versions see the gradle.properties file
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    api "net.fabricmc:fabric-loader:${project.loader_version}"
-
-	// Fabric API. This is technically optional, but you probably want it anyway.
-	// modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-
-	// Uncomment the following line to enable the deprecated Fabric API modules. 
-	// These are included in the Fabric API production distribution and allow you to update your mod to the latest modules at a later more convenient time.
-
-	// modImplementation "net.fabricmc.fabric-api:fabric-api-deprecated:${project.fabric_version}"
-
-	modApi "me.shedaniel.cloth:cloth-config-fabric:15.0.127"
-	modApi "com.terraformersmc:modmenu:11.0.0"
-
-    implementation 'com.google.code.gson:gson:2.10.1'
+    id 'me.fallenbreath.yamlang' version '1.4.1' apply false
 }
 
 preprocess {
     strictExtraMappings = false
-
     def mc12104 = createNode('1.21.4', 1_21_04, '')
 }
 
@@ -49,8 +16,7 @@ tasks.register('buildAndGather') {
     }
     doFirst {
         println 'Gathering builds'
-        def buildLibs = { p -> p.buildDir.toPath().resolve('libs')
-        }
+        def buildLibs = { p -> p.buildDir.toPath().resolve('libs') }
         delete fileTree(buildLibs(rootProject)) {
             include '*'
         }
@@ -65,5 +31,16 @@ tasks.register('buildAndGather') {
             }
             delete(buildLibs(project))
         }
+    }
+}
+
+idea {
+    module {
+        excludeDirs += [
+                file('src'),
+                file('build'),
+                file('.gradle'),
+                file('run')
+        ]
     }
 }
