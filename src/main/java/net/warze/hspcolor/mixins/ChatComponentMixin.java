@@ -1,16 +1,20 @@
 package net.warze.hspcolor.mixins;
 
+import net.warze.hspcolor.utils.LoggerUtils;
 import net.warze.hspcolor.utils.MCServerUtils;
 import net.warze.hspcolor.utils.Ranks;
 import net.warze.hspcolor.utils.Replacement;
 import net.warze.hspcolor.utils.TextUtils;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.client.Minecraft;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -58,7 +62,6 @@ public abstract class ChatComponentMixin {
         MutableComponent message = args.get(MESSAGE_IDX);
 
         List<Component> siblings = message.getSiblings();
-        List<Component> newSiblings = new ArrayList<>(siblings.size());
 
         List<Map.Entry<String, Integer>> colorReplacements = List.of(
             Map.entry("#D4448C", 0xE985F7), // HERO+
@@ -70,72 +73,60 @@ public abstract class ChatComponentMixin {
             Map.entry("#FAD9F7", 0xD8D8FA)  // shout
         );
 
-        for (Component sibling : siblings) {
-            Component newSibling = sibling;
+        for (int i = 0; i < siblings.size(); i++) {
+            Component sibling = siblings.get(i);
             if (sibling.getStyle().getColor() != null) {
                 String color = sibling.getStyle().getColor().toString();
+                // LoggerUtils.info("Color: " + color);
                 for (var entry : colorReplacements) {
                     if (color.equalsIgnoreCase(entry.getKey())) {
-                        newSibling = Component.literal(sibling.getString())
-                                .setStyle(sibling.getStyle().withColor(entry.getValue()));
+                        siblings.set(i, Component.literal(sibling.getString())
+                            .setStyle(sibling.getStyle().withColor(entry.getValue())));
                         break;
                     }
                 }
             }
-            newSiblings.add(newSibling);
         }
 
-        if (newSiblings.size() > 4) {
-            Component secondSibling = newSiblings.get(2);
-
+        if (siblings.size() > 4 && siblings.get(2) instanceof MutableComponent second) {
             for (String rank : RANKS) {
                 Replacement r = new Replacement(
-                        Pattern.compile(Ranks.Old.get(rank)),
-                        Ranks.New.get(rank),
-                        Ranks.RoleColor.get(rank),
-                        Ranks.NameColor.get(rank)
+                    Pattern.compile(Ranks.Old.get(rank)),
+                    Ranks.New.get(rank),
+                    Ranks.RoleColor.get(rank),
+                    Ranks.NameColor.get(rank)
                 );
-
-                if (!(secondSibling instanceof MutableComponent)) continue;
-
-                MutableComponent replaced = TextUtils.replaceTextInComponent(secondSibling, r.pattern, r.rolepill);
+                
+                MutableComponent replaced = TextUtils.replaceTextInComponent(second, r.pattern, r.rolepill);
 
                 // No changes were made, meaning it's not a guild chat message
-                if (replaced.getString().equals(secondSibling.getString())) continue;
+                if (replaced == second) continue;
 
-                // Replace the color of the blue role pill with the custom color-coded one
-                newSiblings.set(2, replaced.setStyle(secondSibling.getStyle().withColor(r.rolecolor)));
-
-                if (newSiblings.size() <= 5) break;
-
+                // Replace the color of the blue role pill with the custom color-coded one 
+                replaced.setStyle(second.getStyle()).withColor(r.rolecolor);
+                siblings.set(2, replaced);
+                
+                if (siblings.size() <= 5) break;
+                
                 // Replace the color of the username with the custom color-coded one
-                Component fifthSibling = newSiblings.get(4);
-                String fifthText = fifthSibling.getString();
-                newSiblings.set(4, Component.literal(fifthText).setStyle(fifthSibling.getStyle().withColor(r.namecolor)));
-
+                String fifthText = siblings.get(5).getString();
+                siblings.set(5, Component.literal(fifthText).setStyle(siblings.get(5).getStyle()).withColor(r.namecolor));
+                
                 // If the username still has additional components, replace their colors too
-                if (fifthText.endsWith(":") || newSiblings.size() <= 6) break;
-
-                Component sixthSibling = newSiblings.get(6);
-                String sixthText = sixthSibling.getString();
-                newSiblings.set(6, Component.literal(sixthText).setStyle(sixthSibling.getStyle().withColor(r.namecolor)));
-
-                if (sixthText.endsWith(":") || newSiblings.size() <= 7) break;
-
-                Component seventhSibling = newSiblings.get(7);
-                String seventhText = seventhSibling.getString();
-                newSiblings.set(7, Component.literal(seventhText).setStyle(seventhSibling.getStyle().withColor(r.namecolor)));
-
+                if (fifthText.endsWith(":") || siblings.size() <= 6) break;
+            
+                String sixthText = siblings.get(6).getString();
+                siblings.set(6, Component.literal(sixthText).setStyle(siblings.get(6).getStyle()).withColor(r.namecolor));
+            
+                if (sixthText.endsWith(":") || siblings.size() <= 7) break;
+            
+                String seventhText = siblings.get(7).getString();
+                siblings.set(7, Component.literal(seventhText).setStyle(siblings.get(7).getStyle()).withColor(r.namecolor));
+            
                 break;
             }
         }
 
-        // Create a new message component with the modified siblings
-        MutableComponent newMessage = Component.empty().setStyle(message.getStyle());
-        for (Component sibling : newSiblings) {
-            newMessage.append(sibling);
-        }
-
-        args.set(MESSAGE_IDX, newMessage);
+        args.set(MESSAGE_IDX, message);
     }
 }

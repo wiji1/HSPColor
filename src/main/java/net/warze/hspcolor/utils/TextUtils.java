@@ -3,7 +3,6 @@ package net.warze.hspcolor.utils;
 import net.minecraft.network.chat.*;
 import net.minecraft.network.chat.contents.PlainTextContents.LiteralContents;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -16,28 +15,30 @@ public class TextUtils {
     }
 
     /**
-     * replace keywords in a {@link Component} by creating a new component
+     * replace keywords in a {@link MutableComponent}
      *
-     * @param component   the text
-     * @param pattern     the RegEx pattern of the old string
-     * @param replacement new string
-     * @return new component with replacements applied
+     * @param text      the text
+     * @param oldStringPattern the RegEx pattern of the old string
+     * @param newString new string
+     * @return text after replacement
      */
-    public static MutableComponent replaceTextInComponent(Component component, Pattern pattern, String replacement) {
-        MutableComponent newComponent;
-
+    public static MutableComponent replaceTextInComponent(MutableComponent component, Pattern pattern, String replacement) {
         if (component.getContents() instanceof LiteralContents literal) {
             String text = literal.text();
             String replaced = pattern.matcher(text).replaceAll(replacement);
-            newComponent = Component.literal(replaced).withStyle(component.getStyle());
-        } else newComponent = component.copy();
+            if (!replaced.equals(text)) {
+                component = Component.literal(replaced).withStyle(component.getStyle());
+            }
+        }
 
         List<Component> siblings = component.getSiblings();
-        List<Component> newSiblings = new ArrayList<>(siblings.size());
+        for (int i = 0; i < siblings.size(); i++) {
+            Component sibling = siblings.get(i);
+            if (sibling instanceof MutableComponent mutableSibling) {
+                siblings.set(i, replaceTextInComponent(mutableSibling, pattern, replacement));
+            }
+        }
 
-        for (Component sibling : siblings) newSiblings.add(replaceTextInComponent(sibling, pattern, replacement));
-        for (Component newSibling : newSiblings) newComponent.append(newSibling);
-
-        return newComponent;
+        return component;
     }
 }
