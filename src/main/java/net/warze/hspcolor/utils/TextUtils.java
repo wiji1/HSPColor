@@ -47,6 +47,33 @@ public class TextUtils {
         return newComponent;
     }
 
+    public static Component recolorComponent(Component component, List<Map.Entry<String, Integer>> colorReplacements) {
+        Style newStyle = component.getStyle();
+        if (newStyle.getColor() != null) {
+            String color = newStyle.getColor().formatValue();
+            for (var entry : colorReplacements) {
+                if (color.equalsIgnoreCase(entry.getKey())) {
+                    newStyle = newStyle.withColor(entry.getValue());
+                    break;
+                }
+            }
+        }
+
+        List<Component> newChildren = new ArrayList<>();
+        for (Component child : component.getSiblings()) {
+            newChildren.add(recolorComponent(child, colorReplacements));
+        }
+
+        MutableComponent result = Component.literal(component.getContents() instanceof LiteralContents lc ? lc.text() : "")
+                .setStyle(newStyle);
+
+        for (Component child : newChildren) {
+            result.append(child);
+        }
+
+        return result;
+    }
+
     public static boolean messageHasNickHoverDeep(Component message) {
         boolean hasNick = false;
         if (!message.getSiblings().isEmpty()) {

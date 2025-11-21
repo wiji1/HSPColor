@@ -60,19 +60,7 @@ public abstract class ChatComponentMixin {
         );
 
         for (Component sibling : siblings) {
-            Component newSibling = sibling;
-            if (sibling.getStyle().getColor() != null) {
-                String color = sibling.getStyle().getColor().formatValue();
-
-                for (var entry : colorReplacements) {
-                    if (color.equalsIgnoreCase(entry.getKey())) {
-                        newSibling = Component.literal(sibling.getString())
-                                .setStyle(sibling.getStyle().withColor(entry.getValue()));
-                        break;
-                    }
-                }
-            }
-            newSiblings.add(newSibling);
+            newSiblings.add(TextUtils.recolorComponent(sibling, colorReplacements));
         }
 
         Component prefix = siblings.getFirst();
