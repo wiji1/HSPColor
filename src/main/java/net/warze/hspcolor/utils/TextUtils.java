@@ -74,11 +74,7 @@ public class TextUtils {
 
         if (hover == null) return false;
 
-        System.out.println(hover.getValue(hover.getAction()));
-
-
         if (hover.getValue(hover.getAction()) instanceof Component hoverText) {
-            System.out.println(hoverText.getString());
             return hoverText.getString().contains("real name") || hoverText.getString().contains("nickname");
         }
         return false;
