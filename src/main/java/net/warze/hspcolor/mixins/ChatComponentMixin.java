@@ -8,11 +8,14 @@ import net.warze.hspcolor.utils.Replacement;
 import net.warze.hspcolor.utils.TextUtils;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.client.Minecraft;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -45,7 +48,6 @@ public abstract class ChatComponentMixin {
         if (!MCServerUtils.isWynnCraft()) return;
 
         List<Component> siblings = message.getSiblings();
-        List<Component> newSiblings = new ArrayList<>(siblings.size());
 
         if (siblings.isEmpty()) return;
 
@@ -70,15 +72,13 @@ public abstract class ChatComponentMixin {
 
             for (String rank : RANKS) {
                 Replacement r = new Replacement(
-                        Pattern.compile(Ranks.Old.get(rank)),
-                        Ranks.New.get(rank),
-                        Ranks.RoleColor.get(rank),
-                        Ranks.NameColor.get(rank)
+                    Pattern.compile(Ranks.Old.get(rank)),
+                    Ranks.New.get(rank),
+                    Ranks.RoleColor.get(rank),
+                    Ranks.NameColor.get(rank)
                 );
-
-                if (!(secondSibling instanceof MutableComponent)) continue;
-
-                MutableComponent replaced = TextUtils.replaceTextInComponent(secondSibling, r.pattern, r.rolepill);
+                
+                MutableComponent replaced = TextUtils.replaceTextInComponent(second, r.pattern, r.rolepill);
 
                 // No changes were made, meaning it's not a guild chat message
                 if (replaced.getString().equals(secondSibling.getString())) continue;
