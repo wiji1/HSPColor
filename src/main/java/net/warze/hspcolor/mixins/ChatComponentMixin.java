@@ -1,5 +1,7 @@
 package net.warze.hspcolor.mixins;
 
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
 import net.warze.hspcolor.utils.MCServerUtils;
 import net.warze.hspcolor.utils.Ranks;
 import net.warze.hspcolor.utils.Replacement;
@@ -16,7 +18,9 @@ import java.util.regex.Pattern;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.*;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
+import org.w3c.dom.Text;
 
 /**
  * @author Warze
@@ -33,47 +37,33 @@ public abstract class ChatComponentMixin {
 
     private static final List<String> RANKS = List.copyOf(Ranks.Old.keySet());
 
-    public boolean isGuildMessage(List<Component> siblings) {
-        if (siblings.isEmpty()) return false;
-        try {
-            Component first = siblings.getFirst();
-            String color = String.valueOf(first.getStyle().getColor());
-            String text = first.getString();
-            return GUILD_CHAT_COLOR.equals(color) &&
-                   (text.contains(GUILD_START) || text.contains(GUILD_CONT));
-        } catch (Exception e) {
-            return false;
-        }
-    }
+    private boolean isProcessing = false;
 
-
-    @ModifyArgs(
-        method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/GuiMessage;<init>(ILnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V")
-    )
-    public void onReceivingMessages(Args args) {
+    @Inject(method = "addMessage*", at = @At("HEAD"), cancellable = true)
+    private void onAddMessage(Component message, CallbackInfo ci) {
+        if (isProcessing) return;
         if (!MCServerUtils.isWynnCraft()) return;
-
-        final int MESSAGE_IDX = 1;
-        MutableComponent message = args.get(MESSAGE_IDX);
 
         List<Component> siblings = message.getSiblings();
         List<Component> newSiblings = new ArrayList<>(siblings.size());
 
+        if (siblings.isEmpty()) return;
+
         List<Map.Entry<String, Integer>> colorReplacements = List.of(
-            Map.entry("#D4448C", 0xE985F7), // HERO+
-            Map.entry("#FDDD5C", 0xB8B8B8), // Bomb bell
-            Map.entry("#F3E6B2", 0xE6DA5E), // Bomb bell
-            Map.entry("#A0C84B", 0xDFDAB7), // 1 time bomb
-            Map.entry("#FFD750", 0xFFF7F2), // 1 time bomb
-            Map.entry("#BD45FF", 0x8684FA), // shout
-            Map.entry("#FAD9F7", 0xD8D8FA)  // shout
+                Map.entry("#D4448C", 0xE985F7), // HERO+
+                Map.entry("#FDDD5C", 0xB8B8B8), // Bomb bell
+                Map.entry("#F3E6B2", 0xE6DA5E), // Bomb bell
+                Map.entry("#A0C84B", 0xDFDAB7), // 1 time bomb
+                Map.entry("#FFD750", 0xFFF7F2), // 1 time bomb
+                Map.entry("#BD45FF", 0x8684FA), // shout
+                Map.entry("#FAD9F7", 0xD8D8FA)  // shout
         );
 
         for (Component sibling : siblings) {
             Component newSibling = sibling;
             if (sibling.getStyle().getColor() != null) {
-                String color = sibling.getStyle().getColor().toString();
+                String color = sibling.getStyle().getColor().formatValue();
+
                 for (var entry : colorReplacements) {
                     if (color.equalsIgnoreCase(entry.getKey())) {
                         newSibling = Component.literal(sibling.getString())
@@ -85,7 +75,9 @@ public abstract class ChatComponentMixin {
             newSiblings.add(newSibling);
         }
 
-        if (newSiblings.size() > 4) {
+        Component prefix = siblings.getFirst();
+
+        if ((prefix.getString().contains(GUILD_START) || prefix.getString().contains(GUILD_CONT)) && siblings.size() > 4) {
             Component secondSibling = newSiblings.get(2);
 
             for (String rank : RANKS) {
@@ -108,34 +100,60 @@ public abstract class ChatComponentMixin {
 
                 if (newSiblings.size() <= 5) break;
 
-                // Replace the color of the username with the custom color-coded one
-                Component fifthSibling = newSiblings.get(4);
-                String fifthText = fifthSibling.getString();
-                newSiblings.set(4, Component.literal(fifthText).setStyle(fifthSibling.getStyle().withColor(r.namecolor)));
+                Component nicknameSibling = null;
+                int nicknameIndex = -1;
 
-                // If the username still has additional components, replace their colors too
-                if (fifthText.endsWith(":") || newSiblings.size() <= 6) break;
+                Component usernameSibling = null;
+                int usernameIndex = -1;
 
-                Component sixthSibling = newSiblings.get(6);
-                String sixthText = sixthSibling.getString();
-                newSiblings.set(6, Component.literal(sixthText).setStyle(sixthSibling.getStyle().withColor(r.namecolor)));
+                for(int i = 0; i < siblings.size(); i++) {
+                    Component sibling = siblings.get(i);
 
-                if (sixthText.endsWith(":") || newSiblings.size() <= 7) break;
+                    if (TextUtils.messageHasNickHoverDeep(sibling) && nicknameSibling == null) {
+                        nicknameSibling = sibling;
+                        nicknameIndex = i;
+                        continue;
+                    }
 
-                Component seventhSibling = newSiblings.get(7);
-                String seventhText = seventhSibling.getString();
-                newSiblings.set(7, Component.literal(seventhText).setStyle(seventhSibling.getStyle().withColor(r.namecolor)));
+                    if (sibling.getString().contains(":") && i != nicknameIndex) {
+                        usernameSibling = sibling;
+                        usernameIndex = i;
+
+                        break;
+                    }
+                }
+
+                if (nicknameSibling != null && (usernameSibling == null || nicknameIndex < usernameIndex)) {
+                    Component hoverComponent = TextUtils.GetSiblingWithHover(nicknameSibling);
+                    Style nicknameStyle = hoverComponent == null ? nicknameSibling.getStyle() : hoverComponent.getStyle();
+
+                    newSiblings.set(nicknameIndex, Component.literal(nicknameSibling.getString()).setStyle(nicknameStyle.withColor(r.namecolor)));
+
+                    boolean isPrefix = nicknameSibling.getString().endsWith("/");
+                    if (isPrefix) {
+                        Component postfix = newSiblings.get(nicknameIndex + 1);
+                        newSiblings.set(nicknameIndex + 1, Component.literal(postfix.getString()).setStyle(postfix.getStyle().withColor(r.namecolor)));
+                    }
+                }
+
+                if (usernameSibling != null) newSiblings.set(usernameIndex, Component.literal(usernameSibling.getString()).setStyle(usernameSibling.getStyle().withColor(r.namecolor)));
 
                 break;
             }
         }
-
+//
         // Create a new message component with the modified siblings
         MutableComponent newMessage = Component.empty().setStyle(message.getStyle());
         for (Component sibling : newSiblings) {
             newMessage.append(sibling);
         }
 
-        args.set(MESSAGE_IDX, newMessage);
+        ci.cancel();
+        isProcessing = true;
+        try {
+            ((ChatComponent)(Object)this).addMessage(newMessage);
+        } finally {
+            isProcessing = false;
+        }
     }
 }
